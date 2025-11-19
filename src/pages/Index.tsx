@@ -1,80 +1,192 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Icon from '@/components/ui/icon';
 
+const API = {
+  products: 'https://functions.poehali.dev/4fa4a8b9-0447-43a1-8d04-823ecc126136',
+  auth: 'https://functions.poehali.dev/a8e62537-87aa-49fd-8f86-2340ee960ac7',
+  support: 'https://functions.poehali.dev/aea623fc-7012-49fc-9371-38e625ac77df'
+};
+
 const Index = () => {
   const [cart, setCart] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [supportSession, setSupportSession] = useState<number | null>(null);
+  const [supportMessages, setSupportMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
 
-  const products = [
-    {
-      id: 1,
-      name: 'DREAM Album Special Edition',
-      category: 'albums',
-      price: 2500,
-      image: 'https://cdn.poehali.dev/projects/74625bc7-8a73-45c4-bd24-bdcfba30fa6c/files/922a3da0-021b-4f7b-8266-421e0c72e41b.jpg',
-      rating: 5,
-      reviews: 127,
-    },
-    {
-      id: 2,
-      name: 'Photocard Set Limited',
-      category: 'photocards',
-      price: 800,
-      image: 'https://cdn.poehali.dev/projects/74625bc7-8a73-45c4-bd24-bdcfba30fa6c/files/1f1aac20-dd3a-4731-aa87-f2046c04b150.jpg',
-      rating: 5,
-      reviews: 89,
-    },
-    {
-      id: 3,
-      name: 'Concert Poster A3',
-      category: 'posters',
-      price: 500,
-      image: 'https://cdn.poehali.dev/projects/74625bc7-8a73-45c4-bd24-bdcfba30fa6c/files/0bca37fd-3425-4135-9d26-1b19b777c415.jpg',
-      rating: 4,
-      reviews: 56,
-    },
-    {
-      id: 4,
-      name: 'Mini Album Vol.2',
-      category: 'albums',
-      price: 1800,
-      image: 'https://cdn.poehali.dev/projects/74625bc7-8a73-45c4-bd24-bdcfba30fa6c/files/922a3da0-021b-4f7b-8266-421e0c72e41b.jpg',
-      rating: 5,
-      reviews: 203,
-    },
-    {
-      id: 5,
-      name: 'Photocard Random Pack',
-      category: 'photocards',
-      price: 400,
-      image: 'https://cdn.poehali.dev/projects/74625bc7-8a73-45c4-bd24-bdcfba30fa6c/files/1f1aac20-dd3a-4731-aa87-f2046c04b150.jpg',
-      rating: 4,
-      reviews: 142,
-    },
-    {
-      id: 6,
-      name: 'Tour Poster Collection',
-      category: 'posters',
-      price: 1200,
-      image: 'https://cdn.poehali.dev/projects/74625bc7-8a73-45c4-bd24-bdcfba30fa6c/files/0bca37fd-3425-4135-9d26-1b19b777c415.jpg',
-      rating: 5,
-      reviews: 78,
-    },
-  ];
+  useEffect(() => {
+    fetchProducts();
+    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem('token');
+    if (savedUser && savedToken) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
 
-  const filteredProducts = activeTab === 'all' 
-    ? products 
-    : products.filter(p => p.category === activeTab);
+  useEffect(() => {
+    fetchProducts();
+  }, [activeTab, searchQuery]);
+
+  const fetchProducts = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (activeTab !== 'all') params.append('category', activeTab);
+      
+      const response = await fetch(`${API.products}?${params}`);
+      const data = await response.json();
+      setProducts(data.products || []);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+    
+    try {
+      const response = await fetch(API.auth, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'register',
+          email: formData.get('email'),
+          password: formData.get('password'),
+          name: formData.get('name')
+        })
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
+        setIsAuthOpen(false);
+      } else {
+        alert(data.error || 'Ошибка регистрации');
+      }
+    } catch (error) {
+      console.error('Registration failed:', error);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+    
+    try {
+      const response = await fetch(API.auth, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          email: formData.get('email'),
+          password: formData.get('password')
+        })
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
+        setIsAuthOpen(false);
+      } else {
+        alert(data.error || 'Неверные данные');
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+  };
+
+  const openSupportChat = async () => {
+    if (!user) {
+      alert('Войдите, чтобы связаться с поддержкой');
+      return;
+    }
+    
+    setIsSupportOpen(true);
+    
+    try {
+      const response = await fetch(API.support, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_session',
+          user_id: user.id
+        })
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setSupportSession(data.session_id);
+        loadSupportMessages(data.session_id);
+      }
+    } catch (error) {
+      console.error('Failed to create support session:', error);
+    }
+  };
+
+  const loadSupportMessages = async (sessionId: number) => {
+    try {
+      const response = await fetch(`${API.support}?session_id=${sessionId}`);
+      const data = await response.json();
+      if (response.ok) {
+        setSupportMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    }
+  };
+
+  const sendSupportMessage = async () => {
+    if (!newMessage.trim() || !supportSession || !user) return;
+    
+    try {
+      const response = await fetch(API.support, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_message',
+          session_id: supportSession,
+          user_id: user.id,
+          message: newMessage,
+          is_admin: false
+        })
+      });
+      
+      if (response.ok) {
+        setNewMessage('');
+        loadSupportMessages(supportSession);
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  };
 
   const addToCart = (product: any) => {
     const existing = cart.find(item => item.id === product.id);
@@ -118,57 +230,93 @@ const Index = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Icon name="MessageCircle" size={20} />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Служба поддержки</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Ваше имя</Label>
-                      <Input placeholder="Введите имя" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input type="email" placeholder="your@email.com" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Сообщение</Label>
-                      <Textarea placeholder="Опишите вашу проблему" rows={4} />
-                    </div>
-                    <Button className="w-full">Отправить</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button variant="ghost" size="icon" onClick={openSupportChat}>
+                <Icon name="MessageCircle" size={20} />
+              </Button>
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Icon name="User" size={20} />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Вход для владельца</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input type="email" placeholder="admin@karsstore.com" />
+              {user ? (
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" className="gap-2">
+                      <Icon name="User" size={20} />
+                      {user.name}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Профиль</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Имя</Label>
+                        <p className="text-lg">{user.name}</p>
+                      </div>
+                      <div>
+                        <Label>Email</Label>
+                        <p className="text-lg">{user.email}</p>
+                      </div>
+                      <div>
+                        <Label>Роль</Label>
+                        <Badge variant={user.role === 'owner' ? 'default' : 'secondary'}>
+                          {user.role === 'owner' ? 'Владелец' : 'Покупатель'}
+                        </Badge>
+                      </div>
+                      <Button onClick={handleLogout} variant="outline" className="w-full">
+                        Выйти
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Пароль</Label>
-                      <Input type="password" placeholder="••••••••" />
-                    </div>
-                    <Button className="w-full">Войти</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogContent>
+                </Dialog>
+              ) : (
+                <Dialog open={isAuthOpen} onOpenChange={setIsAuthOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Icon name="User" size={20} />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Вход / Регистрация</DialogTitle>
+                    </DialogHeader>
+                    <Tabs defaultValue="login">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="login">Вход</TabsTrigger>
+                        <TabsTrigger value="register">Регистрация</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="login">
+                        <form onSubmit={handleLogin} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Email</Label>
+                            <Input type="email" name="email" placeholder="your@email.com" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Пароль</Label>
+                            <Input type="password" name="password" placeholder="••••••••" required />
+                          </div>
+                          <Button type="submit" className="w-full">Войти</Button>
+                        </form>
+                      </TabsContent>
+                      <TabsContent value="register">
+                        <form onSubmit={handleRegister} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Имя</Label>
+                            <Input type="text" name="name" placeholder="Ваше имя" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Email</Label>
+                            <Input type="email" name="email" placeholder="your@email.com" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Пароль</Label>
+                            <Input type="password" name="password" placeholder="••••••••" required />
+                          </div>
+                          <Button type="submit" className="w-full">Зарегистрироваться</Button>
+                        </form>
+                      </TabsContent>
+                    </Tabs>
+                  </DialogContent>
+                </Dialog>
+              )}
 
               <Sheet>
                 <SheetTrigger asChild>
@@ -248,89 +396,9 @@ const Index = () => {
                           <span>Итого:</span>
                           <span>{cartTotal} ₽</span>
                         </div>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button className="w-full" size="lg">
-                              Оформить заказ
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-lg">
-                            <DialogHeader>
-                              <DialogTitle>Оформление заказа</DialogTitle>
-                            </DialogHeader>
-                            <ScrollArea className="max-h-[70vh]">
-                              <div className="space-y-4 pr-4">
-                                <div className="space-y-2">
-                                  <Label>Имя</Label>
-                                  <Input placeholder="Ваше имя" />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Телефон</Label>
-                                  <Input placeholder="+7 (___) ___-__-__" />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Email</Label>
-                                  <Input type="email" placeholder="your@email.com" />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Способ доставки</Label>
-                                  <Tabs defaultValue="courier" className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2">
-                                      <TabsTrigger value="courier">Курьер</TabsTrigger>
-                                      <TabsTrigger value="pickup">Самовывоз</TabsTrigger>
-                                    </TabsList>
-                                    <TabsContent value="courier" className="space-y-2 mt-4">
-                                      <Label>Адрес доставки</Label>
-                                      <Input placeholder="Улица, дом, квартира" />
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <Input placeholder="Город" />
-                                        <Input placeholder="Индекс" />
-                                      </div>
-                                      <p className="text-sm text-muted-foreground">Доставка: 500 ₽</p>
-                                    </TabsContent>
-                                    <TabsContent value="pickup" className="mt-4">
-                                      <p className="text-sm text-muted-foreground">
-                                        📍 Москва, ул. Арбат, 15<br/>
-                                        Пн-Пт: 10:00-20:00<br/>
-                                        Сб-Вс: 11:00-19:00
-                                      </p>
-                                    </TabsContent>
-                                  </Tabs>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Способ оплаты</Label>
-                                  <Tabs defaultValue="card" className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2">
-                                      <TabsTrigger value="card">Карта</TabsTrigger>
-                                      <TabsTrigger value="cash">Наличные</TabsTrigger>
-                                    </TabsList>
-                                    <TabsContent value="card" className="space-y-2 mt-4">
-                                      <Input placeholder="Номер карты" />
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <Input placeholder="ММ/ГГ" />
-                                        <Input placeholder="CVV" />
-                                      </div>
-                                    </TabsContent>
-                                    <TabsContent value="cash" className="mt-4">
-                                      <p className="text-sm text-muted-foreground">
-                                        Оплата при получении
-                                      </p>
-                                    </TabsContent>
-                                  </Tabs>
-                                </div>
-                                <div className="pt-4 border-t">
-                                  <div className="flex justify-between mb-4">
-                                    <span className="text-lg font-semibold">Итого:</span>
-                                    <span className="text-lg font-semibold">{cartTotal + 500} ₽</span>
-                                  </div>
-                                  <Button className="w-full" size="lg">
-                                    Подтвердить заказ
-                                  </Button>
-                                </div>
-                              </div>
-                            </ScrollArea>
-                          </DialogContent>
-                        </Dialog>
+                        <Button className="w-full" size="lg">
+                          Оформить заказ
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -340,6 +408,40 @@ const Index = () => {
           </div>
         </div>
       </header>
+
+      <Dialog open={isSupportOpen} onOpenChange={setIsSupportOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Чат поддержки</DialogTitle>
+            <DialogDescription>Задайте ваш вопрос, и мы поможем вам!</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-4">
+              {supportMessages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-start' : 'justify-end'}`}>
+                  <Card className={msg.is_admin ? 'bg-muted' : 'bg-primary text-primary-foreground'}>
+                    <CardContent className="p-3">
+                      <p className="text-sm font-semibold mb-1">{msg.user_name}</p>
+                      <p className="text-sm">{msg.message}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <div className="flex gap-2">
+            <Input 
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Введите сообщение..."
+              onKeyPress={(e) => e.key === 'Enter' && sendSupportMessage()}
+            />
+            <Button onClick={sendSupportMessage}>
+              <Icon name="Send" size={18} />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-secondary/20" />
@@ -355,14 +457,18 @@ const Index = () => {
             <p className="text-xl text-muted-foreground mb-8">
               Официальные альбомы, фотокарточки и постеры K-pop групп
             </p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <Button size="lg" className="gap-2">
-                Смотреть каталог
-                <Icon name="ArrowRight" size={18} />
-              </Button>
-              <Button size="lg" variant="outline">
-                Акции
-              </Button>
+            <div className="max-w-md mx-auto mb-6">
+              <div className="flex gap-2">
+                <Input 
+                  placeholder="Поиск товаров..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1"
+                />
+                <Button variant="outline" size="icon">
+                  <Icon name="Search" size={20} />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -379,7 +485,7 @@ const Index = () => {
             </TabsList>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <Card key={product.id} className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-2 hover:border-primary/50">
                   <div className="relative overflow-hidden aspect-square">
                     <img 
@@ -412,59 +518,7 @@ const Index = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-primary">{product.price} ₽</span>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="gap-2">
-                            <Icon name="MessageSquare" size={16} />
-                            Отзывы
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg">
-                          <DialogHeader>
-                            <DialogTitle>Отзывы о {product.name}</DialogTitle>
-                          </DialogHeader>
-                          <ScrollArea className="max-h-[60vh]">
-                            <div className="space-y-4 pr-4">
-                              <Card>
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className="flex gap-1">
-                                      {[...Array(5)].map((_, i) => (
-                                        <Icon key={i} name="Star" size={14} className="fill-primary text-primary" />
-                                      ))}
-                                    </div>
-                                    <span className="font-semibold">Анна К.</span>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    Отличное качество! Альбом пришёл в идеальном состоянии, все фотокарточки на месте.
-                                  </p>
-                                </CardContent>
-                              </Card>
-                              <Card>
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <div className="flex gap-1">
-                                      {[...Array(4)].map((_, i) => (
-                                        <Icon key={i} name="Star" size={14} className="fill-primary text-primary" />
-                                      ))}
-                                      <Icon name="Star" size={14} className="text-muted" />
-                                    </div>
-                                    <span className="font-semibold">Мария Л.</span>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    Очень красивый дизайн, быстрая доставка. Рекомендую!
-                                  </p>
-                                </CardContent>
-                              </Card>
-                              <div className="space-y-2 pt-4 border-t">
-                                <Label>Оставить отзыв</Label>
-                                <Textarea placeholder="Поделитесь впечатлениями о товаре" rows={3} />
-                                <Button className="w-full">Отправить</Button>
-                              </div>
-                            </div>
-                          </ScrollArea>
-                        </DialogContent>
-                      </Dialog>
+                      <Badge variant="secondary">В наличии: {product.stock}</Badge>
                     </div>
                   </CardContent>
                 </Card>

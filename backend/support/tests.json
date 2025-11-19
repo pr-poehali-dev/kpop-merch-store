@@ -1,0 +1,35 @@
+{
+  "tests": [
+    {
+      "name": "Create support session",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "create_session",
+        "user_id": 1
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "session_id": "number"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Send message",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "send_message",
+        "session_id": 1,
+        "user_id": 1,
+        "message": "Hello support",
+        "is_admin": false
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "message_id": "number"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
